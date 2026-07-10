@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #0B0F0C;
+    color: #EDEAE1;
+  }
+
+  /* Custom keyboard focus states */
+  *:focus-visible {
+    outline: 2px solid #C9A227;
+    outline-offset: 2px;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0F0C;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #141A15;
+  border: 1px solid #7C9A78;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C9A227;
+}
+
+/* Lab Readout Grid background texture */
+.lab-grid-bg {
+  background-image: 
+    linear-gradient(rgba(124, 154, 120, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 154, 120, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Subtle glowing pulse animations */
+@keyframes lab-pulse-glow {
+  0%, 100% {
+    opacity: 0.2;
+    filter: drop-shadow(0 0 2px rgba(201, 162, 39, 0.3));
+  }
+  50% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 6px rgba(201, 162, 39, 0.6));
+  }
+}
+
+.glow-pulse {
+  animation: lab-pulse-glow 2s infinite ease-in-out;
+}

@@ -1,0 +1,8 @@
+django==4.2.13
+djangorestframework==3.15.1
+django-cors-headers==4.3.1
+tensorflow-cpu==2.16.2
+pillow==10.3.0
+gunicorn==22.0.0
+numpy==1.26.4
+supabase==2.5.1
