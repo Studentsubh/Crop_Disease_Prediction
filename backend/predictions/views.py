@@ -54,19 +54,24 @@ def _run_disease_inference(processed_img):
     predictions_numpy = predictions.numpy()[0]
     predicted_class_idx = int(np.argmax(predictions_numpy))
     confidence = float(predictions_numpy[predicted_class_idx])
-    return parse_prediction(predicted_class_idx, confidence)
+    result = parse_prediction(predicted_class_idx, confidence)
+    return result
 
 
 def _classify_crop_with_stage_one(processed_img):
     plant_idx, plant_confidence, _ = _run_stage_one_classification(processed_img)
 
-    # The new plant classifier is expected to output 3 classes in order:
-    # 0 -> tomato, 1 -> corn, 2 -> other/unsupported plants.
+    # Plant classifier ordering:
+    # 0 -> corn, 1 -> tomato, 2 -> other/unsupported plants.
     if plant_idx == 2 or plant_confidence < 0.9:
         return None, _build_low_confidence_result()
 
-    crop = 'tomato' if plant_idx == 0 else 'corn'
+    crop = 'corn' if plant_idx == 0 else 'tomato'
     return crop, None
+
+
+def _is_low_confidence(result):
+    return float(result.get('confidence', 0)) < 0.9
 
 # Supabase Client Imports
 try:
@@ -195,14 +200,25 @@ class PredictView(APIView):
             # 4. Run the first-stage plant classifier.
             crop, unsupported_result = _classify_crop_with_stage_one(processed_img)
             if unsupported_result is not None:
-                log_prediction_to_supabase(unsupported_result, uploaded_file)
                 return Response(unsupported_result, status=status.HTTP_200_OK)
             
             # 5. Run the disease model for supported crops.
             result = _run_disease_inference(processed_img)
             result['crop'] = crop
-            
-            # 6. Log to Supabase (uploads image file and logs row)
+
+            # If the disease model itself is low confidence, do not save it.
+            if _is_low_confidence(result):
+                warning = {
+                    'class_raw': 'low_confidence_disease',
+                    'class_display': 'Low confidence — please try a clearer image or different angle.',
+                    'crop': 'unknown',
+                    'confidence': result['confidence'],
+                    'is_healthy': False,
+                    'warning': 'Low confidence disease prediction. Please try a clearer image or different angle.'
+                }
+                return Response(warning, status=status.HTTP_200_OK)
+
+            # 6. Log to Supabase only for valid disease predictions.
             log_prediction_to_supabase(result, uploaded_file)
             
             return Response(result, status=status.HTTP_200_OK)
@@ -249,16 +265,30 @@ class PredictBatchView(APIView):
                 if unsupported_result is not None:
                     unsupported_result["image_name"] = uploaded_file.name
                     unsupported_result["success"] = False
-                    log_prediction_to_supabase(unsupported_result, uploaded_file)
                     results.append(unsupported_result)
                     continue
 
                 pred_details = _run_disease_inference(processed_img)
                 pred_details["crop"] = crop
+                
+                if _is_low_confidence(pred_details):
+                    warning = {
+                        'class_raw': 'low_confidence_disease',
+                        'class_display': 'Low confidence — please try a clearer image or different angle.',
+                        'crop': 'unknown',
+                        'confidence': pred_details['confidence'],
+                        'is_healthy': False,
+                        'warning': 'Low confidence disease prediction. Please try a clearer image or different angle.',
+                        'image_name': uploaded_file.name,
+                        'success': False
+                    }
+                    results.append(warning)
+                    continue
+
                 pred_details["image_name"] = uploaded_file.name
                 pred_details["success"] = True
                 
-                # Log batch item to Supabase (uploads image and logs row)
+                # Log batch item to Supabase only for valid disease predictions.
                 log_prediction_to_supabase(pred_details, uploaded_file)
                 
                 results.append(pred_details)
